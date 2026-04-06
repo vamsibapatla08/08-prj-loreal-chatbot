@@ -7,10 +7,109 @@ const sendBtn = document.getElementById("sendBtn");
 const themeToggle = document.getElementById("themeToggle");
 const themeIcon = document.getElementById("themeIcon");
 const themeLabel = document.getElementById("themeLabel");
+const CONTEXT_STORAGE_KEY = "lorealChatContext";
 
-let messages = [{ role: "system", content: "You are a Loreal assistant. You answer questions about Loreal products, routines, recommendations, provide skincare advice, and related topicson Loreal. If a user's query is not related to Loreal, respond by stating that you don't know about it." }];
+let messages = [
+  {
+    role: "system",
+    content:
+      "You are a Loreal assistant. You answer questions about Loreal products, routines, recommendations, provide skincare advice, and related topicson Loreal. If a user's query is not related to Loreal, respond by stating that you don't know about it.",
+  },
+];
 
 const workerUrl = "https://late-leaf-b809.ravibapatla05usa.workers.dev"; // Replace with your Cloudflare Worker URL
+
+// We store lightweight context so multi-turn chats feel natural.
+let chatContext = {
+  userName: "",
+  pastQuestions: [],
+};
+
+function loadChatContext() {
+  const saved = localStorage.getItem(CONTEXT_STORAGE_KEY);
+
+  if (!saved) {
+    return;
+  }
+
+  try {
+    const parsed = JSON.parse(saved);
+    chatContext.userName = parsed.userName || "";
+    chatContext.pastQuestions = Array.isArray(parsed.pastQuestions)
+      ? parsed.pastQuestions
+      : [];
+  } catch (error) {
+    console.warn("Could not load saved chat context.", error);
+  }
+}
+
+function saveChatContext() {
+  localStorage.setItem(CONTEXT_STORAGE_KEY, JSON.stringify(chatContext));
+}
+
+function extractUserName(text) {
+  // Simple beginner-friendly patterns to catch common name introductions.
+  const patterns = [
+    /my name is\s+([a-z][a-z'\-\s]{0,30})/i,
+    /i am\s+([a-z][a-z'\-\s]{0,30})/i,
+    /i'm\s+([a-z][a-z'\-\s]{0,30})/i,
+    /call me\s+([a-z][a-z'\-\s]{0,30})/i,
+  ];
+
+  for (const pattern of patterns) {
+    const match = text.match(pattern);
+    if (match?.[1]) {
+      return match[1].trim().replace(/\s+/g, " ");
+    }
+  }
+
+  return "";
+}
+
+function updateChatContext(userText) {
+  const foundName = extractUserName(userText);
+
+  if (foundName) {
+    chatContext.userName = foundName;
+  }
+
+  chatContext.pastQuestions.push(userText);
+
+  // Keep only the latest 8 user prompts to avoid oversized payloads.
+  if (chatContext.pastQuestions.length > 8) {
+    chatContext.pastQuestions = chatContext.pastQuestions.slice(-8);
+  }
+
+  saveChatContext();
+}
+
+function buildContextMessage() {
+  const contextLines = [];
+
+  if (chatContext.userName) {
+    contextLines.push(`User name: ${chatContext.userName}`);
+  }
+
+  if (chatContext.pastQuestions.length > 0) {
+    contextLines.push(
+      `Recent user questions: ${chatContext.pastQuestions.join(" | ")}`,
+    );
+  }
+
+  if (contextLines.length === 0) {
+    return {
+      role: "system",
+      content: "No extra conversation context is available.",
+    };
+  }
+
+  return {
+    role: "system",
+    content: `Use this conversation context when helpful for a natural multi-turn reply. ${contextLines.join(". ")}.`,
+  };
+}
+
+loadChatContext();
 
 /* Theme setup */
 const savedTheme = localStorage.getItem("theme");
@@ -52,7 +151,14 @@ themeToggle.addEventListener("click", () => {
 });
 
 // Set initial message
-addMessage("assistant", "👋 Hello! How can I help you today?");
+if (chatContext.userName) {
+  addMessage(
+    "assistant",
+    `👋 Hello ${chatContext.userName}! How can I help you today?`,
+  );
+} else {
+  addMessage("assistant", "👋 Hello! How can I help you today?");
+}
 
 /* Handle form submit */
 chatForm.addEventListener("submit", async (event) => {
@@ -62,6 +168,7 @@ chatForm.addEventListener("submit", async (event) => {
     return;
   }
 
+  updateChatContext(text);
   addMessage("user", text);
   messages.push({ role: "user", content: text });
 
@@ -72,13 +179,19 @@ chatForm.addEventListener("submit", async (event) => {
   const loadingMessage = addMessage("assistant", "Processing your request...");
 
   try {
+    const payloadMessages = [
+      messages[0],
+      buildContextMessage(),
+      ...messages.slice(1),
+    ];
+
     const response = await fetch(workerUrl, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
       // Cloudflare Worker expects the chat history in a `messages` array.
-      body: JSON.stringify({ messages }),
+      body: JSON.stringify({ messages: payloadMessages }),
     });
 
     if (!response.ok) {
