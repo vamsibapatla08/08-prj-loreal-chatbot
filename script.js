@@ -13,7 +13,7 @@ let messages = [
   }
 ]
 
-const workerUrl = "https://your-worker-url.workers.dev"; // Replace with your Cloudflare Worker URL
+const workerUrl = "https://late-leaf-b809.ravibapatla05usa.workers.dev"; // Replace with your Cloudflare Worker URL
 
 /* Theme setup */
 const savedTheme = localStorage.getItem("theme");
