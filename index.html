@@ -17,9 +17,29 @@
 
   <body>
     <div class="page-wrapper">
-
       <!------- Header / Branding ------->
       <header class="site-header">
+        <div class="header-top">
+          <div class="brand-lockup" aria-label="L'Oreal branding">
+            <img
+              src="img/loreal-logo.png"
+              alt="L'Oreal logo"
+              class="brand-logo"
+            />
+          </div>
+
+          <button
+            type="button"
+            id="themeToggle"
+            class="theme-toggle"
+            aria-label="Switch to dark mode"
+            aria-pressed="false"
+          >
+            <span class="material-icons" id="themeIcon">dark_mode</span>
+            <span id="themeLabel">Dark mode</span>
+          </button>
+        </div>
+
         <h1 class="site-title">Smart Product Advisor</h1>
       </header>
 
@@ -45,7 +65,6 @@
               <span class="visually-hidden">Send</span>
             </button>
           </form>
-
         </section>
       </main>
 
@@ -59,7 +78,6 @@
           <a href="#">Contact</a>
         </nav>
       </footer>
-
     </div>
 
     <!-- secrets.js can be removed when using Cloudflare Workers for API requests -->

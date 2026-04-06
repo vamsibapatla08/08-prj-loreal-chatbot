@@ -1,6 +1,7 @@
 // Copy this code into your Cloudflare Worker script
 
 export default {
+
   async fetch(request, env) {
     const corsHeaders = {
       'Access-Control-Allow-Origin': '*',
@@ -37,4 +38,5 @@ export default {
 
     return new Response(JSON.stringify(data), { headers: corsHeaders });
   }
+  
 };
