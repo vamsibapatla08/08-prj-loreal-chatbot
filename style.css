@@ -362,14 +362,38 @@ h6 {
 /* footer */
 .site-footer {
   margin: 60px 0 40px;
+  padding: 22px 20px 18px;
   text-align: center;
   font-size: 14px;
   color: var(--muted-text);
+  border-top: 1px solid var(--glass-border);
+  border-radius: 16px;
+  background: linear-gradient(180deg, var(--glass-bg-1), var(--glass-bg-2));
+  box-shadow: var(--panel-shadow);
 }
 
-.site-footer nav {
+.footer-brand {
+  display: grid;
+  gap: 6px;
+  justify-items: center;
+}
+
+.footer-brand-label {
+  font-family: var(--font-nav-demi);
+  font-size: 15px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--page-text);
+}
+
+.footer-copy {
+  max-width: 34rem;
+  line-height: 1.5;
+}
+
+.footer-links {
   font-family: var(--font-nav-med);
-  margin-top: 12px;
+  margin-top: 16px;
   display: flex;
   justify-content: center;
   flex-wrap: wrap;
@@ -391,6 +415,13 @@ h6 {
   color: var(--footer-link-hover);
   border-color: var(--brand-gold);
   transform: translateY(-1px);
+}
+
+.footer-note {
+  margin-top: 14px;
+  font-size: 13px;
+  letter-spacing: 0.02em;
+  color: color-mix(in srgb, var(--muted-text) 88%, var(--page-text));
 }
 
 @media (max-width: 640px) {
@@ -448,5 +479,6 @@ h6 {
 
   .site-footer {
     margin: 46px 0 28px;
+    padding: 18px 16px 16px;
   }
 }
