@@ -8,6 +8,9 @@ const themeToggle = document.getElementById("themeToggle");
 const themeIcon = document.getElementById("themeIcon");
 const themeLabel = document.getElementById("themeLabel");
 const CONTEXT_STORAGE_KEY = "lorealChatContext";
+const HISTORY_STORAGE_KEY = "lorealChatHistory";
+const MAX_CONTEXT_QUESTIONS = 8;
+const MAX_HISTORY_TURNS = 12;
 
 let messages = [
   {
@@ -24,6 +27,9 @@ let chatContext = {
   userName: "",
   pastQuestions: [],
 };
+
+// We keep recent chat turns so the assistant remembers ongoing conversation details.
+let conversationHistory = [];
 
 function loadChatContext() {
   const saved = localStorage.getItem(CONTEXT_STORAGE_KEY);
@@ -45,6 +51,37 @@ function loadChatContext() {
 
 function saveChatContext() {
   localStorage.setItem(CONTEXT_STORAGE_KEY, JSON.stringify(chatContext));
+}
+
+function loadConversationHistory() {
+  const saved = localStorage.getItem(HISTORY_STORAGE_KEY);
+
+  if (!saved) {
+    return;
+  }
+
+  try {
+    const parsed = JSON.parse(saved);
+
+    if (Array.isArray(parsed)) {
+      conversationHistory = parsed.filter(
+        (item) =>
+          item &&
+          (item.role === "user" || item.role === "assistant") &&
+          typeof item.content === "string" &&
+          item.content.trim().length > 0,
+      );
+    }
+  } catch (error) {
+    console.warn("Could not load saved conversation history.", error);
+  }
+}
+
+function saveConversationHistory() {
+  localStorage.setItem(
+    HISTORY_STORAGE_KEY,
+    JSON.stringify(conversationHistory),
+  );
 }
 
 function extractUserName(text) {
@@ -76,11 +113,24 @@ function updateChatContext(userText) {
   chatContext.pastQuestions.push(userText);
 
   // Keep only the latest 8 user prompts to avoid oversized payloads.
-  if (chatContext.pastQuestions.length > 8) {
-    chatContext.pastQuestions = chatContext.pastQuestions.slice(-8);
+  if (chatContext.pastQuestions.length > MAX_CONTEXT_QUESTIONS) {
+    chatContext.pastQuestions = chatContext.pastQuestions.slice(
+      -MAX_CONTEXT_QUESTIONS,
+    );
   }
 
   saveChatContext();
+}
+
+function addTurnToHistory(role, content) {
+  conversationHistory.push({ role, content });
+
+  // Keep the latest turns only so we do not grow forever in localStorage.
+  if (conversationHistory.length > MAX_HISTORY_TURNS) {
+    conversationHistory = conversationHistory.slice(-MAX_HISTORY_TURNS);
+  }
+
+  saveConversationHistory();
 }
 
 function buildContextMessage() {
@@ -94,6 +144,19 @@ function buildContextMessage() {
     contextLines.push(
       `Recent user questions: ${chatContext.pastQuestions.join(" | ")}`,
     );
+  }
+
+  const recentTurns = conversationHistory.slice(-6);
+
+  if (recentTurns.length > 0) {
+    const conversationSummary = recentTurns
+      .map((turn) => {
+        const label = turn.role === "user" ? "User" : "Assistant";
+        return `${label}: ${turn.content}`;
+      })
+      .join(" | ");
+
+    contextLines.push(`Recent conversation turns: ${conversationSummary}`);
   }
 
   if (contextLines.length === 0) {
@@ -110,6 +173,10 @@ function buildContextMessage() {
 }
 
 loadChatContext();
+loadConversationHistory();
+
+// Rebuild the API message history with system prompt + restored turns.
+messages = [messages[0], ...conversationHistory];
 
 /* Theme setup */
 const savedTheme = localStorage.getItem("theme");
@@ -126,6 +193,20 @@ function addMessage(role, content) {
   chatWindow.appendChild(message);
   chatWindow.scrollTop = chatWindow.scrollHeight;
   return message;
+}
+
+function showLatestQuestion(text) {
+  const previousLatestQuestion = chatWindow.querySelector(".latest-question");
+
+  if (previousLatestQuestion) {
+    previousLatestQuestion.remove();
+  }
+
+  const latestQuestion = document.createElement("div");
+  latestQuestion.classList.add("latest-question");
+  latestQuestion.textContent = `Latest question: ${text}`;
+  chatWindow.appendChild(latestQuestion);
+  chatWindow.scrollTop = chatWindow.scrollHeight;
 }
 
 function applyTheme(theme) {
@@ -150,8 +231,12 @@ themeToggle.addEventListener("click", () => {
   localStorage.setItem("theme", currentTheme);
 });
 
-// Set initial message
-if (chatContext.userName) {
+// Show previous chat turns if they exist, otherwise show a greeting.
+if (conversationHistory.length > 0) {
+  conversationHistory.forEach((turn) => {
+    addMessage(turn.role, turn.content);
+  });
+} else if (chatContext.userName) {
   addMessage(
     "assistant",
     `👋 Hello ${chatContext.userName}! How can I help you today?`,
@@ -171,11 +256,13 @@ chatForm.addEventListener("submit", async (event) => {
   updateChatContext(text);
   addMessage("user", text);
   messages.push({ role: "user", content: text });
+  addTurnToHistory("user", text);
 
   userInput.value = "";
   userInput.focus();
   sendBtn.disabled = true;
 
+  showLatestQuestion(text);
   const loadingMessage = addMessage("assistant", "Processing your request...");
 
   try {
@@ -206,6 +293,7 @@ chatForm.addEventListener("submit", async (event) => {
     }
 
     messages.push({ role: "assistant", content: assistantMessage });
+    addTurnToHistory("assistant", assistantMessage);
     loadingMessage.textContent = assistantMessage;
   } catch (error) {
     console.error("Error connecting to the API:", error);
