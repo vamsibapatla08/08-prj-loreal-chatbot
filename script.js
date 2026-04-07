@@ -16,7 +16,7 @@ let messages = [
   {
     role: "system",
     content:
-      "You are a Loreal assistant. You answer questions related to Loreal products, routines, recommendations, provide skincare advice, and related topics on Loreal. If a user's query is not related to Loreal, respond by stating that you don't know about it.",
+      "You are a L'Oreal beauty assistant. You only answer questions related to L'Oreal products, routines, recommendations, and beauty topics like skincare, makeup, haircare, fragrance, and beauty tips. If a user asks about unrelated topics (for example coding, sports, finance, politics, history, homework, or general trivia), politely refuse and guide them back to L'Oreal or beauty-related questions.",
   },
 ];
 
@@ -209,6 +209,60 @@ function showLatestQuestion(text) {
   chatWindow.scrollTop = chatWindow.scrollHeight;
 }
 
+function isGreeting(text) {
+  const normalizedText = text.toLowerCase().trim();
+
+  // Keep greetings friendly so users can start naturally.
+  return /^(hi|hello|hey|good\s+morning|good\s+afternoon|good\s+evening)\b/.test(
+    normalizedText,
+  );
+}
+
+function isBeautyOrLorealQuestion(text) {
+  const normalizedText = text.toLowerCase();
+
+  // Beginner-friendly keyword check to keep the chatbot on topic.
+  const allowedTopicKeywords = [
+    "loreal",
+    "l'oréal",
+    "beauty",
+    "skincare",
+    "skin care",
+    "makeup",
+    "foundation",
+    "concealer",
+    "mascara",
+    "lipstick",
+    "serum",
+    "moisturizer",
+    "cleanser",
+    "sunscreen",
+    "spf",
+    "routine",
+    "hair",
+    "haircare",
+    "hair care",
+    "location",
+    "shampoo",
+    "conditioner",
+    "fragrance",
+    "perfume",
+    "anti-aging",
+    "anti aging",
+    "acne",
+    "dry skin",
+    "oily skin",
+    "sensitive skin",
+    "product",
+    "recommend",
+    "recommendation",
+  ];
+
+  return allowedTopicKeywords.some((keyword) =>
+    normalizedText.includes(keyword),
+  );
+}
+
 function applyTheme(theme) {
   document.documentElement.setAttribute("data-theme", theme);
   const isDark = theme === "dark";
@@ -257,6 +311,19 @@ chatForm.addEventListener("submit", async (event) => {
   addMessage("user", text);
   messages.push({ role: "user", content: text });
   addTurnToHistory("user", text);
+
+  // Refuse unrelated questions before calling the API.
+  if (!isGreeting(text) && !isBeautyOrLorealQuestion(text)) {
+    const refusalMessage =
+      "I can only help with L'Oreal products, routines, recommendations, and beauty-related topics. Please ask a question related to L'Oreal, and I'll be happy to help.";
+
+    messages.push({ role: "assistant", content: refusalMessage });
+    addTurnToHistory("assistant", refusalMessage);
+    addMessage("assistant", refusalMessage);
+    userInput.value = "";
+    userInput.focus();
+    return;
+  }
 
   userInput.value = "";
   userInput.focus();
